@@ -3,7 +3,6 @@ package com.mixpanel.android.mpmetrics;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.Application;
-import android.app.FragmentTransaction;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -15,9 +14,6 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 
-import com.mixpanel.android.R;
-import com.mixpanel.android.takeoverinapp.TakeoverInAppActivity;
-import com.mixpanel.android.util.ActivityImageUtils;
 import com.mixpanel.android.util.MPLog;
 import com.mixpanel.android.viewcrawler.TrackingDebug;
 import com.mixpanel.android.viewcrawler.UpdatesFromMixpanel;
@@ -44,7 +40,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.locks.ReentrantLock;
 
 
 /**
@@ -1830,99 +1825,7 @@ public class MixpanelAPI {
         }
 
         private void showGivenOrAvailableNotification(final InAppNotification notifOrNull, final Activity parent) {
-            if (Build.VERSION.SDK_INT < MPConfig.UI_FEATURES_MIN_API) {
-                MPLog.v(LOGTAG, "Will not show notifications, os version is too low.");
-                return;
-            }
-
-            parent.runOnUiThread(new Runnable() {
-                @Override
-                @TargetApi(MPConfig.UI_FEATURES_MIN_API)
-                public void run() {
-                    final ReentrantLock lock = UpdateDisplayState.getLockObject();
-                    lock.lock();
-                    try {
-                        if (UpdateDisplayState.hasCurrentProposal()) {
-                            MPLog.v(LOGTAG, "DisplayState is locked, will not show notifications.");
-                            return; // Already being used.
-                        }
-
-                        InAppNotification toShow = notifOrNull;
-                        if (null == toShow) {
-                            toShow = getNotificationIfAvailable();
-                        }
-                        if (null == toShow) {
-                            MPLog.v(LOGTAG, "No notification available, will not show.");
-                            return; // Nothing to show
-                        }
-
-                        final InAppNotification.Type inAppType = toShow.getType();
-                        if (inAppType == InAppNotification.Type.TAKEOVER && !ConfigurationChecker.checkTakeoverInAppActivityAvailable(parent.getApplicationContext())) {
-                            MPLog.v(LOGTAG, "Application is not configured to show takeover notifications, none will be shown.");
-                            return; // Can't show due to config.
-                        }
-
-                        final int highlightColor = ActivityImageUtils.getHighlightColorFromBackground(parent);
-                        final UpdateDisplayState.DisplayState.InAppNotificationState proposal =
-                                new UpdateDisplayState.DisplayState.InAppNotificationState(toShow, highlightColor);
-                        final int intentId = UpdateDisplayState.proposeDisplay(proposal, getDistinctId(), mToken);
-                        if (intentId <= 0) {
-                            MPLog.e(LOGTAG, "DisplayState Lock in inconsistent state! Please report this issue to Mixpanel");
-                            return;
-                        }
-
-                        switch (inAppType) {
-                            case MINI: {
-                                final UpdateDisplayState claimed = UpdateDisplayState.claimDisplayState(intentId);
-                                if (null == claimed) {
-                                    MPLog.v(LOGTAG, "Notification's display proposal was already consumed, no notification will be shown.");
-                                    return; // Can't claim the display state
-                                }
-                                final InAppFragment inapp = new InAppFragment();
-                                inapp.setDisplayState(
-                                    MixpanelAPI.this,
-                                    intentId,
-                                    (UpdateDisplayState.DisplayState.InAppNotificationState) claimed.getDisplayState()
-                                );
-                                inapp.setRetainInstance(true);
-
-                                MPLog.v(LOGTAG, "Attempting to show mini notification.");
-                                final FragmentTransaction transaction = parent.getFragmentManager().beginTransaction();
-                                transaction.setCustomAnimations(0, R.animator.com_mixpanel_android_slide_down);
-                                transaction.add(android.R.id.content, inapp);
-
-                                try {
-                                    transaction.commit();
-                                } catch (IllegalStateException e) {
-                                    // if the app is in the background or the current activity gets killed, rendering the
-                                    // notifiction will lead to a crash
-                                    MPLog.v(LOGTAG, "Unable to show notification.");
-                                    mDecideMessages.markNotificationAsUnseen(toShow);
-                                }
-                            }
-                            break;
-                            case TAKEOVER: {
-                                MPLog.v(LOGTAG, "Sending intent for takeover notification.");
-
-                                final Intent intent = new Intent(parent.getApplicationContext(), TakeoverInAppActivity.class);
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-                                intent.putExtra(TakeoverInAppActivity.INTENT_ID_KEY, intentId);
-                                parent.startActivity(intent);
-                            }
-                            break;
-                            default:
-                                MPLog.e(LOGTAG, "Unrecognized notification type " + inAppType + " can't be shown");
-                        }
-                        if (!mConfig.getTestMode()) {
-                            trackNotificationSeen(toShow);
-                        }
-                    } finally {
-                        lock.unlock();
-                    }
-                } // run()
-
-            });
+            MPLog.e(LOGTAG, "Feature disabled");
         }
     }// PeopleImpl
 
